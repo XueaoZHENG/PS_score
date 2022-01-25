@@ -1,0 +1,225 @@
+### 20220119
+### concur
+
+###S1 R bedtools  deeptools
+setwd("D:/BigData/2015cell_riboseq/00ref")
+rm(list=ls())
+library(Hmisc)
+library(corrplot)
+library(ggpmisc)
+library(ggpubr)
+library(ggplot2)
+library(ggthemes)
+library(psych)
+library(stringr)
+library(pheatmap)
+library(Rmisc)
+library(dplyr)
+
+df001 = read.delim ("D:/BigData/2015cell_riboseq/00ref/Saccharomyces_cerevisiae.R64-1-1.104.gtf",header = F)
+df002 = df001[df001$V3 == "transcript",]
+df002$V10 = str_extract(df002$V9,"(?<=(transcript_id ))(.*)(?=(\\; gene_name))")  #### R 的 正则表达式 提取 trancript id
+df002[is.na(df002$V10),"V10"] = str_extract(df002[is.na(df002$V10),"V9"],"(?<=(transcript_id ))(.*)(?=(\\; gene_source))") #### 补充NA的数值
+df002$V11 = str_extract(df002$V9,"(?<=(gene_id ))(.*)(?=(\\; transcript_id))")  #### R 的 正则表达式 提取 trancript id
+df002[is.na(df002$V10),"V10"] = str_extract(df002[is.na(df002$V10),"V9"],"(?<=(gene_id ))(.*)(?=(\\; gene_source))") #### 补充NA的数值
+df003 = read.delim ("D:/BigData/2015cell_riboseq/others/GSE67387_Scer_ribo_rawCounts/GSE67387_Scer_ribo_rawCounts.txt",row.names = 1)
+df004 = df003 %>% filter_all(all_vars(.>20))  ### 过滤掉所有 小于20的 reads
+df004$id = row.names(df004)
+df0023 = merge(df002,df004, by.x = "V11",by.y = "id")
+df005 = read.csv ("C:/Users/zhengxueao/OneDrive/og_data/sc_codon.csv ",header = T)
+df00235 = merge(df0023,df005, by.x = "V10",by.y = "ID")
+df00236 = arrange(df00235,-df00235$Total_aa)
+
+write.table(as.data.frame(df00236),"Sc_trans_fbed.tab",row.names = T,col.names = T,quote = F, sep = "\t")
+
+long21 = round(nrow(df00236)/5)
+long22 = round(nrow(df00236)*2/5)
+long23 = round(nrow(df00236)*3/5)
+long24 = round(nrow(df00236)*4/5)
+long25 = nrow(df00236)
+
+write.table(as.data.frame(df00236[,c("V1","V4","V5","V10")]),"Sc_trans_GTF_total.bed",row.names = F,col.names = F,quote = F, sep = "\t")
+write.table(as.data.frame(df00236[1:long21,c("V1","V4","V5","V10")]),"Sc_trans_GTF_G1.bed",row.names = F,col.names = F,quote = F, sep = "\t")
+write.table(as.data.frame(df00236[long21:long22,c("V1","V4","V5","V10")]),"Sc_trans_GTF_G2.bed",row.names = F,col.names = F,quote = F, sep = "\t")
+write.table(as.data.frame(df00236[long22:long23,c("V1","V4","V5","V10")]),"Sc_trans_GTF_G3.bed",row.names = F,col.names = F,quote = F, sep = "\t")
+write.table(as.data.frame(df00236[long23:long24,c("V1","V4","V5","V10")]),"Sc_trans_GTF_G4.bed",row.names = F,col.names = F,quote = F, sep = "\t")
+write.table(as.data.frame(df00236[long24:long25,c("V1","V4","V5","V10")]),"Sc_trans_GTF_G5.bed",row.names = F,col.names = F,quote = F, sep = "\t")
+
+###S2 LINUX bed 提取bam 文件  20220119_concur.sh
+# ls -d *.rm.bam|while read id; do bedtools intersect -a $id -b ../group_bed/Sc_trans_GTF_total.bed > $id.total.bam; done;
+
+ls -d *.total.bam|while read id; do bedtools intersect -a $id -b ../../group_bed/Sc_trans_GTF_G1.bed > $id.G1.bam; done;\
+ls -d *.total.bam|while read id; do bedtools intersect -a $id -b ../../group_bed/Sc_trans_GTF_G2.bed > $id.G2.bam; done;\
+ls -d *.total.bam|while read id; do bedtools intersect -a $id -b ../../group_bed/Sc_trans_GTF_G3.bed > $id.G3.bam; done;\
+ls -d *.total.bam|while read id; do bedtools intersect -a $id -b ../../group_bed/Sc_trans_GTF_G4.bed > $id.G4.bam; done;\
+ls -d *.total.bam|while read id; do bedtools intersect -a $id -b ../../group_bed/Sc_trans_GTF_G5.bed > $id.G5.bam; done;\
+ls -d *bam|while read id; do perl concur.pl -i $id -g sc3 -o $id_file; done;
+
+###S3 LINUX concur 计算
+ls -d *bam|while read id; do perl concur.pl -i $id -g sc3 -o $id'_res'; done;
+
+### S4 A  site表格读取
+rm(list=ls())
+library("ggplot2")
+setwd("D:/BigData/2015cell_riboseq/20220116_yeast/A_site/w_1")
+filename <- list.files("D:/BigData/2015cell_riboseq/20220116_yeast/A_site/w_1")
+data_list <- lapply(filename,read.table,sep='\t',header=TRUE)
+
+Asite = data.frame(
+g1 = data_list[[1]]$X6,
+g2 = data_list[[2]]$X6,
+g3 = data_list[[3]]$X6,
+g4 = data_list[[4]]$X6,
+g5 = data_list[[5]]$X6
+)
+row.names(Asite) = data_list[[1]]$Codon
+write.table(as.data.frame(Asite),"Asite.txt",sep = "\t")
+
+su = data.frame(apply(Asite, 2, sum))
+Asite_fre = apply(Asite,1, function(x){x/su[,1]}) ### 先按列求合 再按行除以列和
+write.table(as.data.frame(Asite_fre),"Asite_fren.txt",sep = "\t")
+
+rm(list=ls())
+library("ggplot2")
+setwd("D:/BigData/2015cell_riboseq/20220116_yeast/A_site/m_1")
+filename <- list.files("D:/BigData/2015cell_riboseq/20220116_yeast/A_site/m_1")
+data_list <- lapply(filename,read.table,sep='\t',header=TRUE)
+
+Asite = data.frame(
+g1 = data_list[[1]]$X6,
+g2 = data_list[[2]]$X6,
+g3 = data_list[[3]]$X6,
+g4 = data_list[[4]]$X6,
+g5 = data_list[[5]]$X6
+)
+row.names(Asite) = data_list[[1]]$Codon
+write.table(as.data.frame(Asite),"Asite.txt",sep = "\t")
+su = data.frame(apply(Asite, 2, sum))
+Asite_fre = apply(Asite,1, function(x){x/su[,1]}) ### 先按列求合 再按行除以列和
+write.table(as.data.frame(Asite_fre),"Asite_fren.txt",sep = "\t")
+
+###
+
+setwd("D:/BigData/2015cell_riboseq/20220116_yeast/A_site")
+library(pheatmap)
+wt= read.table("./w_1/Asite_fren.txt")
+mut= read.table("./m_1/Asite_fren.txt")
+
+total_su = data.frame(
+wt = apply(wt, 1, sum),
+mut = apply(mut, 1, sum)
+)
+
+s2codon =  (mut-wt)*64
+# s2codon$total = apply(mut, 1, sum)
+
+bk <- c(seq(0,0.9,by=0.03))
+pheatmap(s2codon,
+         cluster_cols = FALSE,
+         cluster_rows = FALSE,
+         scale = "none",
+         border=T,
+         # cellwidth = 50,
+         # cellheight = 25,
+         main = "",
+         color = colorRampPalette(c("darkblue","yellow" ,"red"))(30), #### B2182B
+         cutree_cols = 2,
+         filename = "A-SITE_0.pdf",   ### ***
+         display_numbers = F,
+         breaks = bk,
+         show_colnames = T,
+         show_rownames = T,
+         width = 12,
+         height = 2.5
+)
+
+
+### 20220118
+###  S1 R bedtools 前处理比对 提取比对的transcript
+setwd("D:/BigData/2015cell_riboseq/00ref")
+rm(list=ls())
+library(Hmisc)
+library(corrplot)
+library(ggpmisc)
+library(ggpubr)
+library(ggplot2)
+library(ggthemes)
+library(psych)
+library(stringr)
+library(pheatmap)
+library(Rmisc)
+
+df001 = read.delim ("D:/BigData/2015cell_riboseq/00ref/Saccharomyces_cerevisiae.R64-1-1.104.gtf",header = F)
+df002 = df001[df001$V3 == "transcript",]
+df002$V10 = str_extract(df002$V9,"(?<=(transcript_id ))(.*)(?=(\\; gene_name))")  #### R 的 正则表达式 提取 trancript id
+df002[is.na(df002$V10),"V10"] = str_extract(df002[is.na(df002$V10),"V9"],"(?<=(transcript_id ))(.*)(?=(\\; gene_source))") #### 补充NA的数值
+
+write.table(as.data.frame(df002[,1:9]),"Sc_trans_GTF.txt",row.names = F,col.names = F,quote = F, sep = "\t")
+df004 = read.csv ("C:/Users/zhengxueao/OneDrive/og_data/sc_codon.csv ",header = T)
+df0024 = merge(df002,df004, by.x = "V10", by.y = "ID")
+df003 = arrange(df0024,-df0024$Total_aa)
+write.table(as.data.frame(df003[1:1250,c("V1","V4","V5","V10")]),"Sc_trans_GTF_long.bed",row.names = F,col.names = F,quote = F, sep = "\t")
+write.table(as.data.frame(df003[5000:6250,c("V1","V4","V5","V10")]),"Sc_trans_GTF_short.bed",row.names = F,col.names = F,quote = F, sep = "\t")
+
+### S2 linux bedtools  bam 文件提取长短蛋白 目标文件区域 bam 序列
+bedtools intersect -a SRR1944912.1_1.fastq.gz.sam.bam.rm.bam -b ../../00ref/Sc_trans_GTF_long.bed > SRR1944912.1_1.fastq.gz.sam.bam.rm.bam.long.bam
+bedtools intersect -a $id -b ../../00ref/Sc_trans_GTF_long.bed > $id.long.bam
+
+ls -d *.rm.bam|while read id; do bedtools intersect -a $id -b ../../00ref/Sc_trans_GTF_long.bed > $id.long.bam; done;
+ls -d *.rm.bam|while read id; do bedtools intersect -a $id -b ../../00ref/Sc_trans_GTF_short.bed > $id.short.bam; done;
+
+### S3 linux concur
+perl concur.pl -i   -g sc3 -o
+perl concur.pl -i WT_long_1.bam -g sc3 -o WT_1
+ls -d *bam|while read id; do perl concur.pl -i $id -g sc3 -o $idfile; done;
+
+### S4 A  site表格读取
+rm(list=ls())
+library("ggplot2")
+setwd("D:/BigData/2015cell_riboseq/20220116_yeast/Psite")
+filename <- list.files("D:/BigData/2015cell_riboseq/20220116_yeast/Psite")
+data_list <- lapply(filename,read.table,sep='\t',header=TRUE)
+Asite = data.frame(
+ml1 = data_list[[1]]$X6,
+ml2 = data_list[[2]]$X6,
+ml3 = data_list[[3]]$X6,
+ms1 = data_list[[4]]$X6,
+ms2 = data_list[[5]]$X6,
+ms3 = data_list[[6]]$X6,
+Wl1 = data_list[[7]]$X6,
+Wl2 = data_list[[8]]$X6,
+Wl3 = data_list[[9]]$X6,
+Ws1 = data_list[[10]]$X6,
+Ws2 = data_list[[11]]$X6,
+Ws3 = data_list[[12]]$X6)
+row.names(Asite) = data_list[[1]]$Codon
+write.table(as.data.frame(Asite),"../Asite.txt",sep = "\t")
+row.names(Asite) = data_list[[1]]$Codon
+su = data.frame(apply(Asite, 2, sum))
+Asite_fre = apply(Asite,1, function(x){x/su[,1]}) ### 先按列求合 再按行除以列和
+write.table(as.data.frame(Asite_fre),"Asite_fren.txt",sep = "\t")
+
+### 相对频率计算 差异被均一化了
+rm(list=ls())
+library(ggthemes)
+df001 = read.delim ("../Asite_fren.txt")
+df001["ml",] = apply(df001[1:3,],2,mean)
+df001["ms",] = apply(df001[4:6,],2,mean)
+df001["Wl",] = apply(df001[7:9,],2,mean)
+df001["Ws",] = apply(df001[10:12,],2,mean)
+df001["mlvsWl",] = df001["ml",]/df001["Wl",]
+df001["msvsWs",] = df001["ms",]/df001["Ws",]
+df002 = stack (df001[17:18,])
+df002$length = c("Long","Short")
+df002= arrange(df002,df002$values)
+
+ggplot(df002, aes(ind, values, color=length)) +
+  geom_point(size=3) +
+  xlab("Codon") +
+  ylab("Frenquency")+
+  # theme_dot+
+  theme(axis.text.x = element_text(angle = 45, hjust = 0.5, vjust = 0.5))
+  # scale_x_continuous(limits=c(-40, 40))+
+  # scale_y_continuous(limits=c(-40, 40))+
+  # coord_fixed()
+ggsave("codon_fre.pdf", width = 12, height = 6)
