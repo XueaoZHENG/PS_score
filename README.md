@@ -1,1 +1,2 @@
 # PS_score
+A-site pausing score of each sample is calculated by the read counts at a given codon normalized by the average read counts of 64 codons. The read counts at a given codon are counted by using Concur Perl concur.pl -i -g sc3 -o (Frye and Bornelöv, 2021). The reads 5’ ends mapping to positions around the expected peak 12-nts upstream of the translation initiation site is used to predict the optimal offset. 
